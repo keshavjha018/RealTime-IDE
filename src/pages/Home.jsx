@@ -53,7 +53,11 @@ export default function NewRoom() {
     <div className='homePageWrapper'>
       <div className='formWrapper'>
 
-        <img src={icon} alt="madalgos-logo" className='homePageLogo' />
+        <div className="headingBox">
+          <img src={icon} alt="madalgos-logo" className='homePageLogo' />
+          <span className="headingText"> Welcome to <br/> Realtime IDE </span>
+        </div>
+
         <h4 className='mainLabel'> Paste Room ID to join a room</h4>
 
         <div className='inputGroup'>
@@ -92,6 +96,13 @@ export default function NewRoom() {
 
         </div>
       </div>
+
+      <footer>
+        <h4>
+          Built for Data Networks 🌐 Project &nbsp; by &nbsp;
+          <a href="https://github.com/keshavjha018/RealTime-IDE">Team 21</a>
+        </h4>
+      </footer>
     </div>
   )
 }
