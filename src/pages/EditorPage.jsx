@@ -21,6 +21,63 @@ import {
 import axios from 'axios';
 import { CircularProgress } from "@material-ui/core";
 import Backdrop from "@mui/material/Backdrop";
+import Peer from 'simple-peer';
+import micmute from "../assets/micmute.svg";
+import micunmute from "../assets/micunmute.svg";
+import webcam from "../assets/webcam.svg";
+import webcamoff from "../assets/webcamoff.svg";
+import { Rnd } from "react-rnd";
+import { Grid, makeStyles } from '@material-ui/core';
+import Box from '@mui/material/Box';
+
+
+const useStyles3 = makeStyles((theme) => ({
+  video: {
+    width: '100%',
+    position: "static",
+    borderRadius: "8px",
+    margin: "1px",
+    [theme.breakpoints.down('xs')]: {
+      width: '300px',
+    }
+  },
+  paper: {
+    padding: '10px',
+    border: '2px solid black',
+    margin: '10px',
+  },
+  smallVideo: {
+    left: 0,
+    position: "absolute",
+    display: 'flex',
+    // width: '30%',
+    height: '32%',
+    marginTop: "-0.7rem",
+    // paddingRight: "0.5rem",
+    // float: "right"
+  },
+}))
+
+// Video Component
+const Video = ({ peer }) => {
+  const ref = useRef();
+  const classes3 = useStyles3();
+
+  useEffect(() => {
+
+    // setting a live video stream for pirticular peer
+    peer.on("stream", (stream) => {
+      ref.current.srcObject = stream;
+    });
+  }, []);
+
+  return (
+    <>
+      <video playsInline autoPlay ref={ref} className={classes3.video} />
+    </>
+  )
+};
+
 
 export default function EditorPage() {
 
@@ -29,6 +86,7 @@ export default function EditorPage() {
   const location = useLocation();
   const reactNavigator = useNavigate();
   const codeRef = useRef(null);
+  const classes3 = useStyles3();
   
   const [codeLang, setCodeLang] = useState('cpp');
   const [theme, setTheme] = useState('dracula');
@@ -37,6 +95,62 @@ export default function EditorPage() {
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [peers, setPeers] = useState([]);
+  const [audioFlag, setAudioFlag] = useState(true);
+  const [videoFlag, setVideoFlag] = useState(true);
+  const [userUpdate, setUserUpdate] = useState([]);
+  const userVideo = useRef();
+  const peersRef = useRef([]);
+
+  // setting video constrains
+  const videoConstraints = {
+    frameRate: 12,
+    noiseSuppression: true,
+    width: 260,
+    height: 180
+  };
+  
+  // Creating a new peer
+  function createPeer(userToSignal, callerID, stream) {
+    const peer = new Peer({
+      initiator: true,
+      trickle: false,
+      stream,
+    });
+
+    // Sending the signal(SDP) to socket server 
+    peer.on("signal", (signal) => {
+      socketRef.current.emit(ACTIONS.REQ_TO_CONNECT, {
+        userToSignal,
+        callerID,
+        signal,
+      });
+    });
+
+    return peer;
+  }
+
+  // Adding a new peer to stream
+  function addPeer(incomingSignal, callerID, stream) {
+
+    const peer = new Peer({
+      initiator: false,
+      trickle: false,
+      stream,
+    });
+
+    // Sending the signal(SDP) to socket server of new joined user
+    peer.on("signal", (signal) => {
+      socketRef.current.emit(ACTIONS.RES_TO_CONNECT, { signal, callerID });
+    });
+
+    // sending the offer to the peers present in stream
+    peer.signal(incomingSignal);
+
+    return peer;
+  }
+
+
 
   useEffect(() => {
     async function init() {
@@ -47,11 +161,17 @@ export default function EditorPage() {
       socketRef.current.on('connect_error', (err)=> handleErrors(err));
       socketRef.current.on('connect_failed', (err)=> handleErrors(err));
 
+      const stream = await navigator.mediaDevices
+        .getUserMedia({ video: videoConstraints, audio: true })
+
       // Send join event to server - this user joined
       socketRef.current.emit(ACTIONS.JOIN, {
         roomId,
         username : location.state?.username,
       });
+
+       // setting userVideo strem to our current video input
+       userVideo.current.srcObject = stream;
 
       // Listen for joined events - other user joined 
       socketRef.current.on(ACTIONS.JOINED, async({clients, username, socketId}) => {
@@ -67,6 +187,78 @@ export default function EditorPage() {
           socketId,
         });
       })
+
+      // creating peers of all users to create stream
+      socketRef.current.on(ACTIONS.ALL_PEERS, (users) => {
+
+        // initilazing an empty array
+        const peersTemp = [];
+
+        users.forEach((userID) => {
+
+          // creating a new peer of out current streem
+          const peer = createPeer(userID, socketRef.current.id, stream);
+          // updating the global peers list
+          peersRef.current.push({
+            peerID: userID,
+            peer,
+          });
+
+          peersTemp.push({
+            peerID: userID,
+            peer,
+          });
+        });
+        setPeers(peersTemp);
+        // setPeers(uniqByKeepFirst(peers, (it) => it.peerID))
+      });
+
+      // when a new user is joined stream
+      socketRef.current.on(ACTIONS.PEER_JOINED, (payload) => {
+
+        // initilazing peer of new joined user
+        const peer = addPeer(payload.signal, payload.callerID, stream);
+
+        peersRef.current.push({
+          peerID: payload.callerID,
+          peer,
+        });
+        const newPeer = {
+          peer,
+          peerID: payload.callerID,
+        };
+        const tempPeer = peers
+        tempPeer.push(newPeer)
+        setPeers(tempPeer);
+      });
+
+      // When a user leaves the stream
+      socketRef.current.on(ACTIONS.PEER_LEFT, (id) => {
+
+        // Finding the peer details 
+        const peerObj = peersRef.current.find((p) => p.peerID === id);
+        if (peerObj) {
+          // removing the peer details if exists
+          peerObj.peer.destroy();
+        }
+
+        // removing the peer details from the useState too
+        const peers = peersRef.current.filter((p) => p.peerID !== id);
+        peersRef.current = peers;
+        setPeers(peers);
+      });
+
+      socketRef.current.on(ACTIONS.ACK_TO_CONNECT, (payload) => {
+        const item = peersRef.current.find((p) => p.peerID === payload.id);
+
+        // sending the acknowledgment offer to the peer for connection
+        item.peer.signal(payload.signal);
+      });
+
+      // for sending the update related to show/display video and mute/unmute audio
+      socketRef.current.on(ACTIONS.MEDIADEVICE_STATE_CHANGE, (payload) => {
+        setUserUpdate(payload);
+      });
 
       // Listen for disconnected
       socketRef.current.on(ACTIONS.DISCONNECTED, 
@@ -87,6 +279,11 @@ export default function EditorPage() {
       // Cleaning up listeners
       socketRef.current.off(ACTIONS.JOINED);
       socketRef.current.off(ACTIONS.DISCONNECTED);
+      socketRef.current.off(ACTIONS.ALL_PEERS);
+      socketRef.current.off(ACTIONS.PEER_JOINED);
+      socketRef.current.off(ACTIONS.PEER_LEFT);
+      socketRef.current.off(ACTIONS.ACK_TO_CONNECT);
+      socketRef.current.off(ACTIONS.MEDIADEVICE_STATE_CHANGE);
       socketRef.current.disconnect();
     }
   },[])
@@ -126,16 +323,18 @@ export default function EditorPage() {
         input,
       })
       
-      console.log("res: ", res.data);
+      console.log("res: ", res.data.data);
       setOutput(res.data.data.output);
   
-      setLoading(false);
       toast.success('Executed successfully');
+      toast.success('CPU Time: ' + res.data.data.cpuTime + "s");
+      toast.success('Memory Used: '+ res.data.data.memory +"Kb");
 
     } catch(err) {
       console.log(err);
       toast.error("Compiler API Server Error");
     }
+    setLoading(false);
   }
 
   return (
@@ -235,6 +434,103 @@ export default function EditorPage() {
         <button className='copyBtn btn' onClick={copyRoomId}> Copy Room ID</button>
         <button className='leaveBtn btn' onClick={leaveRoom} > Leave </button>
       </div>
+
+      <Rnd bounds="parent">
+          <Box>
+            <Grid container>
+              {/* showing the video of all the users present in stream except own */}
+              <Grid container spacing={2} item direction="row">
+                {
+                  peers.map((peer, idx) => {
+                    return (
+                      <>
+                        <Grid item key={peer.peerID} >
+                          <Video peer={peer.peer} className={classes3.video} />
+                        </Grid>
+                      </>
+                    );
+                  })
+                }
+              </Grid>
+              {/* showing our own video */}
+              <Grid item container direction="row" justifyContent='center' style={{ marginTop: "-3.7rem", }}>
+                <Grid item>
+                  <video muted ref={userVideo} autoPlay playsInline className={classes3.smallVideo} />
+                </Grid>
+                <Grid item container sm justifyContent='center' spacing={2} style={{ zIndex: "1" }}>
+                  <Grid item>
+                    <img style={{
+                      cursor: "pointer",
+                      height: "25px"
+                    }}
+                      src={videoFlag ? webcam : webcamoff}
+                      alt="img"
+                      onClick={() => {
+                        if (userVideo.current.srcObject) {
+                          userVideo.current.srcObject.getTracks().forEach(function (track) {
+                            if (track.kind === "video") {
+                              if (track.enabled) {
+                                socketRef.current.emit(ACTIONS.MEDIADEVICE_STATE_CHANGE, [...userUpdate, {
+                                  id: socketRef.current.id,
+                                  videoFlag: false,
+                                  audioFlag,
+                                }]);
+                                track.enabled = false;
+                                setVideoFlag(false);
+                              } else {
+                                socketRef.current.emit(ACTIONS.MEDIADEVICE_STATE_CHANGE, [...userUpdate, {
+                                  id: socketRef.current.id,
+                                  videoFlag: true,
+                                  audioFlag,
+                                }]);
+                                track.enabled = true;
+                                setVideoFlag(true);
+                              }
+                            }
+                          });
+                        }
+                      }}
+                    />
+                  </Grid>
+                  <Grid item>
+                    <img style={{
+                      cursor: "pointer",
+                      height: "25px"
+                    }}
+                      src={audioFlag ? micunmute : micmute}
+                      alt="img"
+                      onClick={() => {
+                        if (userVideo.current.srcObject) {
+                          userVideo.current.srcObject.getTracks().forEach(function (track) {
+                            if (track.kind === "audio") {
+                              if (track.enabled) {
+                                socketRef.current.emit("change", [...userUpdate, {
+                                  id: socketRef.current.id,
+                                  videoFlag,
+                                  audioFlag: false,
+                                }]);
+                                track.enabled = false;
+                                setAudioFlag(false);
+                              } else {
+                                socketRef.current.emit("change", [...userUpdate, {
+                                  id: socketRef.current.id,
+                                  videoFlag,
+                                  audioFlag: true,
+                                }]);
+                                track.enabled = true;
+                                setAudioFlag(true);
+                              }
+                            }
+                          });
+                        }
+                      }}
+                    />
+                  </Grid>
+                </Grid>
+              </Grid>
+            </Grid >
+          </Box>
+        </Rnd>
 
     </div>
   );
