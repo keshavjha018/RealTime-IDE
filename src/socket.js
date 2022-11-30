@@ -10,6 +10,6 @@ export const initSocket = async () => {
     // const BACKEND_URL = "http://10.0.1.217:5000/"
     // return io(BACKEND_URL, options);
     
-    // REACT_APP_BACKEND_URL=http://localhost:5000/
-    return io(process.env.REACT_APP_BACKEND_URL, options);
+    const BACKEND_URL="http://localhost:5000/"
+    return io(BACKEND_URL, options);
 };

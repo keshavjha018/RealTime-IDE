@@ -27,6 +27,9 @@ app.use("/", coderunRoute);
 
 const userSocketMap = {};
 
+const socketToRoom = {};
+const usersToRoom = {};
+
 function getAllConnectedClients(roomId) {
     // Map
     return Array.from(io.sockets.adapter.rooms.get(roomId) || []).map(
@@ -44,6 +47,18 @@ io.on('connection', (socket) => {
     console.log('socket connected', socket.id);
 
     socket.on(ACTIONS.JOIN, ({ roomId, username }) => {
+
+      if (usersToRoom[roomId]) {
+        usersToRoom[roomId].push(socket.id);
+      } else {
+        usersToRoom[roomId] = [socket.id];
+      }
+
+      socketToRoom[socket.id] = roomId;
+
+      const usersInThisRoom = usersToRoom[roomId].filter(id => id !== socket.id);
+      socket.emit(ACTIONS.ALL_PEERS, usersInThisRoom);
+
         userSocketMap[socket.id] = username;
         socket.join(roomId);
         const clients = getAllConnectedClients(roomId);
@@ -54,6 +69,18 @@ io.on('connection', (socket) => {
                 socketId: socket.id,
             });
         });
+    });
+
+    socket.on(ACTIONS.REQ_TO_CONNECT, payload => {
+      io.to(payload.userToSignal).emit(ACTIONS.PEER_JOINED, { signal: payload.signal, callerID: payload.callerID });
+    });
+
+    socket.on(ACTIONS.RES_TO_CONNECT, payload => {
+      io.to(payload.callerID).emit(ACTIONS.ACK_TO_CONNECT, { signal: payload.signal, id: socket.id });
+    });
+
+    socket.on(ACTIONS.MEDIADEVICE_STATE_CHANGE, (payload) => {
+      socket.broadcast.emit(ACTIONS.MEDIADEVICE_STATE_CHANGE, payload)
     });
 
     socket.on(ACTIONS.CODE_CHANGE, ({ roomId, code }) => {
