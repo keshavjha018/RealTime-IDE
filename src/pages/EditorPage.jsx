@@ -7,8 +7,12 @@ import Navbar from '../components/EditorNavbar'
 import ACTIONS from '../utils/SocketActions';
 import { initSocket } from '../socket';
 import toast from 'react-hot-toast';
+import TextField from '@mui/material/TextField';
+import IconButton from "@mui/material/IconButton";
+import CloseIcon from "@mui/icons-material/Close";
 import '../styles/editorPage.css'
 import '../styles/sidebar.css'
+import '../styles/runcode.css'
 import {
   useLocation,
   Navigate,
@@ -29,6 +33,7 @@ export default function EditorPage() {
   const [codeLang, setCodeLang] = useState('cpp');
   const [theme, setTheme] = useState('dracula');
   const [clients, setClients] = useState([]);
+  const [showTerminal, setShowTerminal] = useState(false);
 
   useEffect(() => {
     async function init() {
@@ -133,14 +138,52 @@ export default function EditorPage() {
             roomId={roomId}
             onCodeChange={(code) => {
               codeRef.current = code;
-            }}
+            }}            
           />
+          
+          { showTerminal &&      
+          <div className='inputbox' >
+            <div className='inner-inputbox' >
+              <div className='close-button' >
+                <p style={{fontSize:"large"}}>Input</p>
+                  <IconButton >
+                        <CloseIcon onClick={()=> setShowTerminal(false)} />
+                </IconButton>        
+              </div>
+              <TextField
+              id="outlined-multiline-static" 
+              className='input-text'
+              multiline
+              rows={3}              
+            />
+
+              <p style={{fontSize:"large"}}>Output</p>
+              <TextField
+              id="outlined-multiline-static" 
+              className='input-text' 
+              InputProps={{
+              readOnly: true,
+          }}            
+              multiline
+              rows={3}              
+            />
+            <br/>
+            <div className='runbox'>
+              <button className='btn'> Run Code </button>
+            </div>
+            </div>
+            
+          </div>
+          
+      }
         </div>
+
+       
         
       </div>
 
       {/* S I D E B A R */}
-      <div className='sidebar'>
+      <div className='sidebar' style={{position: "sticky"}}>
         <div className='sidebarInner'>
           <div className='logoBox'>
             <img src={icon} alt="" className='sidebarLogo' />
@@ -156,7 +199,8 @@ export default function EditorPage() {
             }
           </div>
         </div>
-
+        <button className='btn'  onClick={()=> setShowTerminal(true)} > Show Terminal </button>
+        <br />
         <button className='copyBtn btn' onClick={copyRoomId}> Copy Room ID</button>
         <button className='leaveBtn btn' onClick={leaveRoom} > Leave </button>
       </div>
