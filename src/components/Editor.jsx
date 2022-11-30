@@ -78,7 +78,7 @@ export default function Editor({ codeLang, setCodeLang, theme, socketRef, roomId
   // Updates syntax highlightings based on the current Language
   useEffect(()=> {
 
-    if(codeLang === 'python') {
+    if(codeLang === 'python3') {
       editorRef.current.setOption('mode', {name: 'python', json: true});
       editorRef.current.setValue("# Code your thoughts here ... \n");
     }

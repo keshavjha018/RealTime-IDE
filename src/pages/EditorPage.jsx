@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from 'react';
-import Drawer from '@mui/material/Drawer';
 import icon from "../assets/logo.png";
 import Client from "../components/Client";
 import Editor from "../components/Editor";
@@ -19,7 +18,9 @@ import {
   useNavigate,
   useParams,
 } from 'react-router-dom';
-
+import axios from 'axios';
+import { CircularProgress } from "@material-ui/core";
+import Backdrop from "@mui/material/Backdrop";
 
 export default function EditorPage() {
 
@@ -29,11 +30,13 @@ export default function EditorPage() {
   const reactNavigator = useNavigate();
   const codeRef = useRef(null);
   
-  const [openSidebar, setOpenSidebar] = useState(false);
   const [codeLang, setCodeLang] = useState('cpp');
   const [theme, setTheme] = useState('dracula');
   const [clients, setClients] = useState([]);
   const [showTerminal, setShowTerminal] = useState(false);
+  const [input, setInput] = useState("");
+  const [output, setOutput] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     async function init() {
@@ -103,10 +106,6 @@ export default function EditorPage() {
     reactNavigator('/');
   }
 
-  const handleSidebar = () => {
-    setOpenSidebar(!openSidebar)
-  }
-
   if (!location.state) {
     return <Navigate to="/" />;
   }
@@ -117,13 +116,34 @@ export default function EditorPage() {
     // router.push('/ide');
   }
 
+  async function handleCodeRun(){
+
+    setLoading(true);
+    try {
+      const res = await axios.post('http://localhost:5000/runcode', {
+        code: codeRef.current,
+        codeLang,
+        input,
+      })
+      
+      console.log("res: ", res.data);
+      setOutput(res.data.data.output);
+  
+      setLoading(false);
+      toast.success('Executed successfully');
+
+    } catch(err) {
+      console.log(err);
+      toast.error("Compiler API Server Error");
+    }
+  }
+
   return (
     <div className='mainWrap'>
 
       {/* E D I T O R */}
       <div className='editorWrap'>
         <Navbar 
-          // handleSidebar={handleSidebar}
           codeLang={codeLang} setCodeLang={setCodeLang}
           theme={theme} setTheme={setTheme}
           socketRef={socketRef}
@@ -142,43 +162,54 @@ export default function EditorPage() {
           />
           
           { showTerminal &&      
-          <div className='inputbox' >
-            <div className='inner-inputbox' >
-              <div className='close-button' >
-                <p style={{fontSize:"large"}}>Input</p>
-                  <IconButton >
-                        <CloseIcon onClick={()=> setShowTerminal(false)} />
-                </IconButton>        
+            <div className='inputbox' >
+              <div className='inner-inputbox' >
+                <div className='close-button' >
+                  <p style={{fontSize:"large"}}>Input</p>
+                    <IconButton  onClick={()=> setShowTerminal(false)}>
+                          <CloseIcon />
+                    </IconButton>        
+                </div>
+
+                <TextField
+                  id="outlined-multiline-static" 
+                  className='input-text'
+                  multiline
+                  rows={3}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                />
+
+                <p style={{fontSize:"large"}}>Output</p>
+                <TextField
+                  id="outlined-multiline-static" 
+                  className='input-text' 
+                  InputProps={{
+                  readOnly: true,
+                  }}            
+                  multiline
+                  rows={3}
+                  value={output}
+                />
+              <br/>
+              <div className='runbox'>
+                <button className='btn' onClick={handleCodeRun}> Run Code </button>
               </div>
-              <TextField
-              id="outlined-multiline-static" 
-              className='input-text'
-              multiline
-              rows={3}              
-            />
+              </div>
+              {/* Loding Spinner */}
+              <Backdrop
+                sx={{
+                  color: "#fff",
+                  zIndex: (theme) => theme.zIndex.drawer + 1,
+                }}
+                open={loading}
+              >
+                <CircularProgress color="inherit" />
+              </Backdrop>
+            </div>
+          }
 
-              <p style={{fontSize:"large"}}>Output</p>
-              <TextField
-              id="outlined-multiline-static" 
-              className='input-text' 
-              InputProps={{
-              readOnly: true,
-          }}            
-              multiline
-              rows={3}              
-            />
-            <br/>
-            <div className='runbox'>
-              <button className='btn'> Run Code </button>
-            </div>
-            </div>
-            
-          </div>
-          
-      }
         </div>
-
-       
         
       </div>
 
