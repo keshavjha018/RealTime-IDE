@@ -324,11 +324,16 @@ export default function EditorPage() {
       })
       
       console.log("res: ", res.data.data);
-      setOutput(res.data.data.output);
+      const outputToDisplay = res.data.data.output + 
+                              "--------------------------\n" +
+                              "CPU Time: " + res.data.data.cpuTime + "s" + 
+                              "\nMemory Used: "+ res.data.data.memory +"b"
+
+      setOutput(outputToDisplay);
   
       toast.success('Executed successfully');
-      toast.success('CPU Time: ' + res.data.data.cpuTime + "s");
-      toast.success('Memory Used: '+ res.data.data.memory +"Kb");
+      // toast.success('CPU Time: ' + res.data.data.cpuTime + "s");
+      // toast.success('Memory Used: '+ res.data.data.memory +"Kb");
 
     } catch(err) {
       console.log(err);
@@ -364,22 +369,13 @@ export default function EditorPage() {
             <div className='inputbox' >
               <div className='inner-inputbox' >
                 <div className='close-button' >
-                  <p style={{fontSize:"large"}}>Input</p>
+                  <p style={{fontSize:"large"}}>Output</p>
                     <IconButton  onClick={()=> setShowTerminal(false)}>
                           <CloseIcon />
                     </IconButton>        
                 </div>
 
-                <TextField
-                  id="outlined-multiline-static" 
-                  className='input-text'
-                  multiline
-                  rows={3}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                />
-
-                <p style={{fontSize:"large"}}>Output</p>
+                
                 <TextField
                   id="outlined-multiline-static" 
                   className='input-text' 
@@ -389,6 +385,16 @@ export default function EditorPage() {
                   multiline
                   rows={3}
                   value={output}
+                />
+
+                <p style={{fontSize:"large"}}>Input</p>
+                <TextField
+                  id="outlined-multiline-static" 
+                  className='input-text'
+                  multiline
+                  rows={3}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
                 />
               <br/>
               <div className='runbox'>
