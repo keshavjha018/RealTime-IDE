@@ -1,6 +1,8 @@
 const express = require('express');
 const app = express();
 const http = require('http');
+const helmet = require("helmet");
+const morgan = require("morgan");
 const path = require('path');
 const { Server } = require('socket.io');
 const ACTIONS = require('./src/utils/SocketActions');
@@ -12,6 +14,16 @@ const io = new Server(server);
 // app.use((req, res, next) => {
 //     res.sendFile(path.join(__dirname, 'build', 'index.html'));
 // });
+
+const cors = require('cors');
+app.use(cors({ origin: true }));
+
+const coderunRoute = require("./code-run");
+
+app.use(express.json());
+app.use(helmet());
+app.use(morgan("common"));
+app.use("/", coderunRoute);
 
 const userSocketMap = {};
 
